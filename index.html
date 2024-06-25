@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulateur d'impôt sur le revenu proposé par LFI en 2022</title>
+    <title>Simulateur d'impôt sur le revenu proposé par LFI en 2022 avec comparaison 2024</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -21,7 +21,7 @@
         h1 {
             text-align: center;
         }
-        label, input, select {
+        label, input, select, canvas {
             display: block;
             width: 100%;
             margin: 10px 0;
@@ -42,34 +42,59 @@
             background: #e9ecef;
             border-radius: 5px;
         }
-        .tax-details {
-            font-size: 0.9em;
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f0f0f0;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Simulateur d'impôt sur le revenu proposé par LFI en 2022</h1>
-        <label for="income">Entrez votre revenu brut :</label>
-        <input type="number" id="income" placeholder="Revenu brut" required>
-        
+        <h1>Simulateur d'impôt sur le revenu proposé par LFI en 2022 avec comparaison 2024</h1>
+        <label for="income">Entrez votre revenu net imposable :</label>
+        <input type="number" id="income" placeholder="Revenu net imposable" required>
+
         <label for="period">Sélectionnez la période :</label>
         <select id="period">
             <option value="annual">Annuel</option>
             <option value="monthly">Mensuel</option>
         </select>
-        
+
         <button onclick="calculateTax()">Calculer</button>
-        
+
         <div id="output" class="result" style="display: none;">
-            <p id="netIncome"></p>
-            <p id="totalTax"></p>
-            <div id="taxDetails"></div>
+            <table>
+                <tr>
+                    <th></th>
+                    <th>Barème LFI 2022</th>
+                    <th>Barème 2024</th>
+                </tr>
+                <tr>
+                    <td>Revenu net après impôt</td>
+                    <td id="netIncome2022"></td>
+                    <td id="netIncome2024"></td>
+                </tr>
+                <tr>
+                    <td>Impôt total payé</td>
+                    <td id="totalTax2022"></td>
+                    <td id="totalTax2024"></td>
+                </tr>
+            </table>
         </div>
+        <canvas id="taxChart"></canvas>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        const taxBrackets = [
+        const taxBrackets2022 = [
             { max: 10292, rate: 0.01 },
             { max: 15438, rate: 0.05 },
             { max: 20584, rate: 0.10 },
@@ -83,39 +108,111 @@
             { max: 144089, rate: 0.50 },
             { max: 267594, rate: 0.55 },
             { max: 411683, rate: 0.60 },
-            { max: Infinity, rate: 0.90 }
+            { max: Infinity, rate: 0.90 },
         ];
 
+        const taxBrackets2024 = [
+            { max: 11294, rate: 0.00 },
+            { max: 28797, rate: 0.11 },
+            { max: 82341, rate: 0.30 },
+            { max: 177106, rate: 0.41 },
+            { max: Infinity, rate: 0.45 },
+        ];
+
+        var chart; // Global chart variable
+
         function calculateTax() {
-            const incomeInput = document.getElementById('income').value;
-            const period = document.getElementById('period').value;
+            const incomeInput = document.getElementById("income").value;
+            const period = document.getElementById("period").value;
+            let annualIncome = period === "monthly" ? incomeInput * 12 : incomeInput;
 
-            let annualIncome = period === 'monthly' ? incomeInput * 12 : incomeInput;
+            let netIncome2022 = annualIncome - calculateTotalTax(annualIncome, taxBrackets2022);
+            let netIncome2024 = annualIncome - calculateTotalTax(annualIncome, taxBrackets2024);
+
+            document.getElementById("netIncome2022").innerText = `${netIncome2022.toFixed(2)}€`;
+            document.getElementById("totalTax2022").innerText = `${calculateTotalTax(annualIncome, taxBrackets2022).toFixed(2)}€`;
+            document.getElementById("netIncome2024").innerText = `${netIncome2024.toFixed(2)}€`;
+            document.getElementById("totalTax2024").innerText = `${calculateTotalTax(annualIncome, taxBrackets2024).toFixed(2)}€`;
+
+            document.getElementById("output").style.display = "block";
+
+            updateChart(annualIncome, taxBrackets2022, taxBrackets2024); // Update the chart with the new data
+        }
+
+        function calculateTotalTax(income, brackets) {
             let totalTax = 0;
-            let remainingIncome = annualIncome;
-            let taxDetailsHtml = '';
+            for (let i = 0; i < brackets.length; i++) {
+                const bracket = brackets[i];
+                const lowerBound = i === 0 ? 0 : brackets[i - 1].max;
+                if (income > lowerBound) {
+                    const taxableIncome = Math.min(income - lowerBound, bracket.max - lowerBound);
+                    const taxPaid = taxableIncome * bracket.rate;
+                    totalTax += taxPaid;
+                } else {
+                    break;
+                }
+            }
+            return totalTax;
+        }
 
-            for (let i = 0; i < taxBrackets.length; i++) {
-                if (remainingIncome <= 0) break;
+        function updateChart(income, taxBrackets2022, taxBrackets2024) {
+            const data2022 = [];
+            const data2024 = [];
+            const labels = [];
 
-                const bracket = taxBrackets[i];
-                const prevMax = i > 0 ? taxBrackets[i - 1].max : 0;
-                const taxableAmount = Math.min(remainingIncome, bracket.max - prevMax);
-                const taxPaid = taxableAmount * bracket.rate;
-
-                totalTax += taxPaid;
-                remainingIncome -= taxableAmount;
-
-                taxDetailsHtml += `<p>Impôt de ${taxPaid.toFixed(2)}€ pour la tranche ${prevMax}€ à ${bracket.max}€ à un taux de ${(bracket.rate * 100).toFixed(0)}%</p>`;
+            for (let i = 1000; i <= income; i += 1000) {
+                labels.push(i + "€");
+                data2022.push(calculateTotalTax(i, taxBrackets2022));
+                data2024.push(calculateTotalTax(i, taxBrackets2024));
             }
 
-            const netIncome = annualIncome - totalTax;
+            if (chart) {
+                chart.destroy(); // If a chart exists, destroy it before creating a new one
+            }
 
-            document.getElementById('netIncome').innerText = `Revenu net après impôt : ${netIncome.toFixed(2)}€`;
-            document.getElementById('totalTax').innerText = `Impôt total payé : ${totalTax.toFixed(2)}€`;
-            document.getElementById('taxDetails').innerHTML = taxDetailsHtml;
-            document.getElementById('output').style.display = 'block';
+            chart = new Chart(document.getElementById("taxChart"), {
+                type: "line",
+                data: {
+                    labels: labels,
+                    datasets: [{
+                            label: 'Barème LFI 2022',
+                            data: data2022,
+                            borderColor: 'red',
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'Barème 2024',
+                            data: data2024,
+                            borderColor: 'blue',
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Impôt (€)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Revenu net imposable (€)'
+                            }
+                        }
+                    },
+                    elements: {
+                        line: {
+                            tension: 0.1 // Disables bezier curves
+                        }
+                    }
+                }
+            });
         }
     </script>
 </body>
 </html>
+
