@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulateur d'impôt sur le revenu proposé par LFI en 2022</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+        }
+        label, input, select {
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 5px;
+        }
+        .tax-details {
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Simulateur d'impôt sur le revenu proposé par LFI en 2022</h1>
+        <label for="income">Entrez votre revenu brut :</label>
+        <input type="number" id="income" placeholder="Revenu brut" required>
+        
+        <label for="period">Sélectionnez la période :</label>
+        <select id="period">
+            <option value="annual">Annuel</option>
+            <option value="monthly">Mensuel</option>
+        </select>
+        
+        <button onclick="calculateTax()">Calculer</button>
+        
+        <div id="output" class="result" style="display: none;">
+            <p id="netIncome"></p>
+            <p id="totalTax"></p>
+            <div id="taxDetails"></div>
+        </div>
+    </div>
+
+    <script>
+        const taxBrackets = [
+            { max: 10292, rate: 0.01 },
+            { max: 15438, rate: 0.05 },
+            { max: 20584, rate: 0.10 },
+            { max: 27789, rate: 0.15 },
+            { max: 30876, rate: 0.20 },
+            { max: 33964, rate: 0.25 },
+            { max: 38081, rate: 0.30 },
+            { max: 44256, rate: 0.35 },
+            { max: 61752, rate: 0.40 },
+            { max: 102921, rate: 0.45 },
+            { max: 144089, rate: 0.50 },
+            { max: 267594, rate: 0.55 },
+            { max: 411683, rate: 0.60 },
+            { max: Infinity, rate: 0.90 }
+        ];
+
+        function calculateTax() {
+            const incomeInput = document.getElementById('income').value;
+            const period = document.getElementById('period').value;
+
+            let annualIncome = period === 'monthly' ? incomeInput * 12 : incomeInput;
+            let totalTax = 0;
+            let remainingIncome = annualIncome;
+            let taxDetailsHtml = '';
+
+            for (let i = 0; i < taxBrackets.length; i++) {
+                if (remainingIncome <= 0) break;
+
+                const bracket = taxBrackets[i];
+                const prevMax = i > 0 ? taxBrackets[i - 1].max : 0;
+                const taxableAmount = Math.min(remainingIncome, bracket.max - prevMax);
+                const taxPaid = taxableAmount * bracket.rate;
+
+                totalTax += taxPaid;
+                remainingIncome -= taxableAmount;
+
+                taxDetailsHtml += `<p>Impôt de ${taxPaid.toFixed(2)}€ pour la tranche ${prevMax}€ à ${bracket.max}€ à un taux de ${(bracket.rate * 100).toFixed(0)}%</p>`;
+            }
+
+            const netIncome = annualIncome - totalTax;
+
+            document.getElementById('netIncome').innerText = `Revenu net après impôt : ${netIncome.toFixed(2)}€`;
+            document.getElementById('totalTax').innerText = `Impôt total payé : ${totalTax.toFixed(2)}€`;
+            document.getElementById('taxDetails').innerHTML = taxDetailsHtml;
+            document.getElementById('output').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
